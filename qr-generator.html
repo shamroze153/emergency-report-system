@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>QR Generator — Emergency Report Locations</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1116;
+    --card:#171b22;
+    --text:#f4f6f8;
+    --muted:#9aa5b1;
+    --border:#2a2f3a;
+    --blue:#1565c0;
+    --blue-dark:#0d47a1;
+    --green:#25d366;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    margin:0;
+    padding:20px;
+  }
+  .wrap{ max-width:720px; margin:0 auto; }
+  h1{ font-size:22px; margin-bottom:4px; }
+  .sub{ color:var(--muted); font-size:14px; margin-bottom:24px; }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:20px;
+  }
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    color:var(--muted);
+    margin-bottom:8px;
+  }
+  input[type="text"], textarea{
+    width:100%;
+    background:#1f242e;
+    border:2px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    color:var(--text);
+    font-size:15px;
+    font-family:inherit;
+  }
+  textarea{ min-height:110px; resize:vertical; margin-top:12px; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
+
+  button{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:14px 20px;
+    font-size:15px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:16px;
+  }
+  button:active{ background:var(--blue-dark); }
+
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+    gap:16px;
+    margin-top:20px;
+  }
+  .qr-item{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    text-align:center;
+  }
+  .qr-item canvas, .qr-item img{
+    background:#fff;
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:10px;
+    max-width:100%;
+  }
+  .qr-name{
+    font-weight:700;
+    font-size:14px;
+    margin-bottom:4px;
+    word-break:break-word;
+  }
+  .qr-url{
+    font-size:11px;
+    color:var(--muted);
+    word-break:break-all;
+    margin-bottom:10px;
+  }
+  .download-btn{
+    background:var(--green);
+    color:#111;
+    border:none;
+    border-radius:8px;
+    padding:9px 14px;
+    font-size:13px;
+    font-weight:700;
+    cursor:pointer;
+    width:100%;
+  }
+  .empty-note{
+    color:var(--muted);
+    font-size:13px;
+    text-align:center;
+    padding:20px 0;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>QR Code Generator</h1>
+  <div class="sub">Generate one QR code per location — each points to your live emergency report page.</div>
+
+  <div class="card">
+    <label for="baseUrl">Your deployed site URL</label>
+    <input type="text" id="baseUrl" value="https://emergency-report-system.vercel.app">
+    <div class="hint">This should already be correct — it's your live Vercel URL.</div>
+
+    <label for="locations" style="margin-top:18px;">Locations (one per line)</label>
+    <textarea id="locations" placeholder="Floor2-Corridor
+Warehouse-GateA
+Reception
+Cafeteria"></textarea>
+    <div class="hint">Use short, clear names — no special characters needed. Each line becomes one QR code.</div>
+
+    <button id="generateBtn">Generate QR Codes</button>
+  </div>
+
+  <div id="results" class="grid"></div>
+  <div id="emptyNote" class="empty-note">Enter your locations above and click Generate.</div>
+</div>
+
+<script>
+  const generateBtn = document.getElementById('generateBtn');
+  const resultsEl = document.getElementById('results');
+  const emptyNote = document.getElementById('emptyNote');
+
+  generateBtn.addEventListener('click', function(){
+    const baseUrl = document.getElementById('baseUrl').value.trim().replace(/\/$/, '');
+    const raw = document.getElementById('locations').value;
+    const locations = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+    resultsEl.innerHTML = '';
+
+    if (!baseUrl || locations.length === 0) {
+      emptyNote.style.display = 'block';
+      emptyNote.textContent = 'Please enter a site URL and at least one location.';
+      return;
+    }
+    emptyNote.style.display = 'none';
+
+    locations.forEach(function(loc){
+      const fullUrl = `${baseUrl}/?location=${encodeURIComponent(loc)}`;
+
+      const item = document.createElement('div');
+      item.className = 'qr-item';
+
+      const qrHolder = document.createElement('div');
+      item.appendChild(qrHolder);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'qr-name';
+      nameEl.textContent = loc;
+      item.appendChild(nameEl);
+
+      const urlEl = document.createElement('div');
+      urlEl.className = 'qr-url';
+      urlEl.textContent = fullUrl;
+      item.appendChild(urlEl);
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'download-btn';
+      downloadBtn.textContent = 'Download PNG';
+      item.appendChild(downloadBtn);
+
+      resultsEl.appendChild(item);
+
+      // Generate QR into qrHolder using qrcodejs (renders <canvas> or <img>)
+      new QRCode(qrHolder, {
+        text: fullUrl,
+        width: 200,
+        height: 200,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      downloadBtn.addEventListener('click', function(){
+        // qrcodejs renders a canvas (or img fallback) inside qrHolder
+        const canvas = qrHolder.querySelector('canvas');
+        const img = qrHolder.querySelector('img');
+        const dataUrl = canvas ? canvas.toDataURL('image/png') : img.src;
+
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `QR-${loc.replace(/[^a-z0-9\-_]/gi,'_')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+  });
+</script>
+</body>
+</html>

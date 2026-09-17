@@ -1,0 +1,676 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Admin Portal — Emergency Report System</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#0e1116;
+    --card:#171b22;
+    --text:#f4f6f8;
+    --muted:#9aa5b1;
+    --border:#2a2f3a;
+    --blue:#1565c0;
+    --blue-dark:#0d47a1;
+    --green:#25d366;
+    --green-dark:#1da851;
+    --red:#d7263d;
+    --warn:#f2a900;
+  }
+  *{box-sizing:border-box;}
+  body{
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    margin:0;
+    padding:0;
+  }
+  .topbar{
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    padding:16px 20px;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    flex-wrap:wrap;
+  }
+  .topbar .siren{ font-size:22px; }
+  .topbar h1{ font-size:17px; margin:0; font-weight:800; }
+  .topbar .status-pill{
+    margin-left:auto;
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:20px;
+    background:#1f242e;
+    color:var(--muted);
+    border:1px solid var(--border);
+  }
+  .status-pill.ok{ color:#7be29a; border-color:#1e8e3e; }
+  .status-pill.bad{ color:#ff8b98; border-color:var(--red); }
+
+  .tabs{
+    display:flex;
+    gap:6px;
+    padding:10px 16px 0;
+    background:var(--card);
+    border-bottom:1px solid var(--border);
+    overflow-x:auto;
+  }
+  .tab-btn{
+    background:none;
+    border:none;
+    color:var(--muted);
+    font-size:14px;
+    font-weight:700;
+    padding:12px 16px;
+    cursor:pointer;
+    border-bottom:3px solid transparent;
+    white-space:nowrap;
+  }
+  .tab-btn.active{
+    color:var(--text);
+    border-bottom-color:var(--blue);
+  }
+
+  .content{
+    max-width:900px;
+    margin:0 auto;
+    padding:24px 16px 60px;
+  }
+  .panel{ display:none; }
+  .panel.active{ display:block; }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:20px;
+    margin-bottom:20px;
+  }
+  .card h2{ font-size:16px; margin:0 0 4px; }
+  .card .desc{ color:var(--muted); font-size:13px; margin-bottom:16px; }
+
+  label{
+    display:block;
+    font-size:13px;
+    font-weight:700;
+    color:var(--muted);
+    margin-bottom:8px;
+    margin-top:16px;
+  }
+  label.first{ margin-top:0; }
+  input[type="text"], input[type="password"], textarea, select{
+    width:100%;
+    background:#1f242e;
+    border:2px solid var(--border);
+    border-radius:10px;
+    padding:12px 14px;
+    color:var(--text);
+    font-size:15px;
+    font-family:inherit;
+  }
+  textarea{ min-height:100px; resize:vertical; }
+  .hint{ font-size:12px; color:var(--muted); margin-top:6px; }
+
+  .btn{
+    background:var(--blue);
+    color:#fff;
+    border:none;
+    border-radius:10px;
+    padding:13px 20px;
+    font-size:14px;
+    font-weight:700;
+    cursor:pointer;
+    margin-top:16px;
+    margin-right:8px;
+  }
+  .btn:active{ background:var(--blue-dark); }
+  .btn.green{ background:var(--green); color:#111; }
+  .btn.green:active{ background:var(--green-dark); }
+  .btn.outline{
+    background:transparent;
+    border:2px solid var(--border);
+    color:var(--text);
+  }
+  .btn.small{ padding:9px 14px; font-size:13px; margin-top:0; }
+  .btn:disabled{ opacity:0.5; cursor:not-allowed; }
+
+  /* Generate QR grid */
+  .qr-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fill, minmax(220px, 1fr));
+    gap:16px;
+    margin-top:20px;
+  }
+  .qr-item{
+    background:#1f242e;
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:16px;
+    text-align:center;
+  }
+  .qr-item canvas, .qr-item img{
+    background:#fff;
+    padding:10px;
+    border-radius:8px;
+    margin-bottom:10px;
+    max-width:100%;
+  }
+  .qr-name{ font-weight:700; font-size:13px; margin-bottom:4px; word-break:break-word; }
+  .qr-url{ font-size:10px; color:var(--muted); word-break:break-all; margin-bottom:10px; }
+
+  .empty-note{ color:var(--muted); font-size:13px; text-align:center; padding:20px 0; }
+
+  /* Dashboard table */
+  table{ width:100%; border-collapse:collapse; font-size:13px; margin-top:10px; }
+  th, td{
+    text-align:left;
+    padding:10px 8px;
+    border-bottom:1px solid var(--border);
+    vertical-align:top;
+  }
+  th{ color:var(--muted); font-size:11px; text-transform:uppercase; letter-spacing:0.05em; }
+  .type-badge{
+    display:inline-block;
+    padding:3px 8px;
+    border-radius:6px;
+    font-size:11px;
+    font-weight:700;
+    background:rgba(215,38,61,0.15);
+    color:#ff8b98;
+  }
+  .table-wrap{ overflow-x:auto; }
+
+  /* Scanner */
+  #scannerRegion{
+    width:100%;
+    max-width:400px;
+    margin:0 auto;
+    border-radius:12px;
+    overflow:hidden;
+  }
+  .scan-result{
+    background:#1f242e;
+    border:1px solid var(--border);
+    border-radius:10px;
+    padding:14px;
+    margin-top:16px;
+    font-size:13px;
+    word-break:break-all;
+  }
+  .scan-result.valid{ border-color:#1e8e3e; }
+  .scan-result.invalid{ border-color:var(--red); }
+  .scan-tag{
+    display:inline-block;
+    font-size:11px;
+    font-weight:700;
+    padding:3px 8px;
+    border-radius:6px;
+    margin-bottom:8px;
+  }
+  .scan-tag.valid{ background:rgba(30,142,62,0.2); color:#7be29a; }
+  .scan-tag.invalid{ background:rgba(215,38,61,0.15); color:#ff8b98; }
+
+  /* Print sheet — only visible when printing */
+  #printSheet{ display:none; }
+  @media print {
+    body *{ visibility:hidden; }
+    #printSheet, #printSheet *{ visibility:visible; }
+    #printSheet{
+      display:block;
+      position:absolute;
+      top:0; left:0;
+      width:100%;
+      background:#fff;
+      color:#000;
+      padding:20px;
+    }
+    .print-grid{
+      display:grid;
+      grid-template-columns:repeat(3, 1fr);
+      gap:24px;
+    }
+    .print-item{
+      text-align:center;
+      border:1px dashed #999;
+      padding:14px;
+      break-inside:avoid;
+    }
+    .print-item img, .print-item canvas{ width:100%; max-width:180px; }
+    .print-item .p-name{ font-weight:700; font-size:14px; margin-top:8px; color:#000; }
+    .print-item .p-url{ font-size:10px; color:#555; word-break:break-all; }
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="siren">🚨</div>
+  <h1>Emergency Report — Admin Portal</h1>
+  <div class="status-pill" id="connStatus">Backend not checked</div>
+</div>
+
+<div class="tabs">
+  <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+  <button class="tab-btn" data-tab="generate">Generate QR</button>
+  <button class="tab-btn" data-tab="scan">Scan & Verify</button>
+  <button class="tab-btn" data-tab="settings">Settings</button>
+</div>
+
+<div class="content">
+
+  <!-- ============ DASHBOARD ============ -->
+  <div class="panel active" id="panel-dashboard">
+    <div class="card">
+      <h2>Recent Incident Reports</h2>
+      <div class="desc">Pulled live from your Google Sheet via the Apps Script backend.</div>
+      <button class="btn" id="refreshDashboardBtn">Refresh</button>
+      <button class="btn outline" id="openSheetBtn">Open Google Sheet</button>
+      <div id="dashboardStatus" class="hint"></div>
+      <div class="table-wrap">
+        <table id="incidentsTable" style="display:none;">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Location</th>
+              <th>Type</th>
+              <th>Description</th>
+              <th>Reporter</th>
+              <th>Phone</th>
+            </tr>
+          </thead>
+          <tbody id="incidentsBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-note" id="dashboardEmpty">Click "Refresh" to load recent reports. Make sure Settings has your Apps Script URL and Admin Token filled in.</div>
+    </div>
+  </div>
+
+  <!-- ============ GENERATE QR ============ -->
+  <div class="panel" id="panel-generate">
+    <div class="card">
+      <h2>Generate Location QR Codes</h2>
+      <div class="desc">Each QR points to your live report page with the campus + location pre-filled.</div>
+
+      <label class="first" for="campusInput">Campus / Site name</label>
+      <input type="text" id="campusInput" placeholder="e.g. Main Campus, Head Office, Warehouse B">
+      <div class="hint">Used as a prefix for every location below. Leave blank if you only have one site.</div>
+
+      <label for="locationsInput">Locations (one per line)</label>
+      <textarea id="locationsInput" placeholder="Floor2-Corridor
+Warehouse-GateA
+Reception
+Cafeteria"></textarea>
+
+      <button class="btn" id="generateBtn">Generate QR Codes</button>
+      <button class="btn green" id="printAllBtn" style="display:none;">Print All (sticker sheet)</button>
+    </div>
+
+    <div class="qr-grid" id="qrResults"></div>
+    <div class="empty-note" id="generateEmpty">Enter a campus name and at least one location, then click Generate.</div>
+  </div>
+
+  <!-- ============ SCAN & VERIFY ============ -->
+  <div class="panel" id="panel-scan">
+    <div class="card">
+      <h2>Scan & Verify a Printed QR</h2>
+      <div class="desc">Use this after printing stickers to confirm each QR opens the right location on your live site — no need to physically test every sticker on your phone.</div>
+
+      <button class="btn" id="startScanBtn">Start Camera</button>
+      <button class="btn outline" id="stopScanBtn" style="display:none;">Stop Camera</button>
+
+      <div id="scannerRegion" style="margin-top:16px;"></div>
+      <div id="scanResultWrap"></div>
+    </div>
+  </div>
+
+  <!-- ============ SETTINGS ============ -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <h2>Settings</h2>
+      <div class="desc">These are saved in this browser only (localStorage) — used by the Dashboard and Generate tabs above.</div>
+
+      <label class="first" for="baseUrlInput">Live report page URL</label>
+      <input type="text" id="baseUrlInput" placeholder="https://your-project.vercel.app">
+
+      <label for="scriptUrlInput">Apps Script Web App URL</label>
+      <input type="text" id="scriptUrlInput" placeholder="https://script.google.com/macros/s/XXXX/exec">
+      <div class="hint">Same URL you pasted into index.html's CONFIG.APPS_SCRIPT_URL.</div>
+
+      <label for="tokenInput">Admin Token</label>
+      <input type="password" id="tokenInput" placeholder="Same value as ADMIN_TOKEN in the Apps Script">
+      <div class="hint">Required for the Dashboard tab to read incidents. Set in the .gs file's CONFIG block.</div>
+
+      <button class="btn" id="saveSettingsBtn">Save Settings</button>
+      <div id="settingsSaved" class="hint" style="display:none; color:#7be29a;">Saved.</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden print-only sheet, filled in by Generate tab -->
+<div id="printSheet">
+  <h2 style="color:#000;">QR Sticker Sheet</h2>
+  <div class="print-grid" id="printGrid"></div>
+</div>
+
+<script>
+  // ---------------------------------------------------------------
+  // Settings (persisted in localStorage)
+  // ---------------------------------------------------------------
+  const SETTINGS_KEY = 'ers_admin_settings_v1';
+
+  function loadSettings(){
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      return raw ? JSON.parse(raw) : {};
+    } catch(e){ return {}; }
+  }
+  function saveSettings(obj){
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(obj));
+  }
+
+  const settings = loadSettings();
+  document.getElementById('baseUrlInput').value = settings.baseUrl || 'https://emergency-report-system.vercel.app';
+  document.getElementById('scriptUrlInput').value = settings.scriptUrl || '';
+  document.getElementById('tokenInput').value = settings.token || '';
+
+  document.getElementById('saveSettingsBtn').addEventListener('click', function(){
+    const obj = {
+      baseUrl: document.getElementById('baseUrlInput').value.trim().replace(/\/$/, ''),
+      scriptUrl: document.getElementById('scriptUrlInput').value.trim(),
+      token: document.getElementById('tokenInput').value.trim()
+    };
+    saveSettings(obj);
+    document.getElementById('settingsSaved').style.display = 'block';
+    setTimeout(()=>{ document.getElementById('settingsSaved').style.display = 'none'; }, 2000);
+    checkConnection();
+  });
+
+  function currentSettings(){ return loadSettings(); }
+
+  // ---------------------------------------------------------------
+  // Tabs
+  // ---------------------------------------------------------------
+  document.querySelectorAll('.tab-btn').forEach(btn=>{
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('panel-' + btn.dataset.tab).classList.add('active');
+      if (btn.dataset.tab === 'scan') { /* camera only starts on button press */ }
+      if (btn.dataset.tab !== 'scan') { stopScanner(); }
+    });
+  });
+
+  // ---------------------------------------------------------------
+  // Connection status check (pings Apps Script GET)
+  // ---------------------------------------------------------------
+  async function checkConnection(){
+    const s = currentSettings();
+    const pill = document.getElementById('connStatus');
+    if (!s.scriptUrl) {
+      pill.textContent = 'Apps Script URL not set';
+      pill.className = 'status-pill bad';
+      return;
+    }
+    pill.textContent = 'Checking backend…';
+    pill.className = 'status-pill';
+    try {
+      const res = await fetch(s.scriptUrl);
+      if (res.ok) {
+        pill.textContent = 'Backend reachable';
+        pill.className = 'status-pill ok';
+      } else {
+        pill.textContent = 'Backend error';
+        pill.className = 'status-pill bad';
+      }
+    } catch(e){
+      pill.textContent = 'Backend unreachable';
+      pill.className = 'status-pill bad';
+    }
+  }
+  checkConnection();
+
+  // ---------------------------------------------------------------
+  // DASHBOARD
+  // ---------------------------------------------------------------
+  document.getElementById('openSheetBtn').addEventListener('click', function(){
+    window.open('https://docs.google.com/spreadsheets/d/15p7vJGIbroBKiWajNwB8jcgjRuMf8NFhFYSNDlf7rOU/edit', '_blank');
+  });
+
+  document.getElementById('refreshDashboardBtn').addEventListener('click', async function(){
+    const s = currentSettings();
+    const statusEl = document.getElementById('dashboardStatus');
+    const table = document.getElementById('incidentsTable');
+    const body = document.getElementById('incidentsBody');
+    const empty = document.getElementById('dashboardEmpty');
+
+    if (!s.scriptUrl || !s.token) {
+      statusEl.textContent = 'Please set Apps Script URL and Admin Token in Settings first.';
+      return;
+    }
+
+    statusEl.textContent = 'Loading…';
+    try {
+      const url = `${s.scriptUrl}?action=list&token=${encodeURIComponent(s.token)}&limit=50`;
+      const res = await fetch(url);
+      const data = await res.json();
+
+      if (data.status === 'error') {
+        statusEl.textContent = 'Error: ' + data.message;
+        return;
+      }
+
+      const rows = data.incidents || [];
+      body.innerHTML = '';
+      rows.slice().reverse().forEach(r=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${escapeHtml(r.timestamp || '')}</td>
+          <td>${escapeHtml(r.location || '')}</td>
+          <td><span class="type-badge">${escapeHtml(r.incidentType || '')}</span></td>
+          <td>${escapeHtml(r.description || '')}</td>
+          <td>${escapeHtml(r.reporterName || '')}</td>
+          <td>${escapeHtml(r.reporterPhone || '')}</td>
+        `;
+        body.appendChild(tr);
+      });
+
+      table.style.display = rows.length ? 'table' : 'none';
+      empty.style.display = rows.length ? 'none' : 'block';
+      empty.textContent = rows.length ? '' : 'No incidents logged yet.';
+      statusEl.textContent = `Loaded ${rows.length} report(s).`;
+    } catch(e){
+      statusEl.textContent = 'Could not load incidents. Check the Apps Script URL and token.';
+    }
+  });
+
+  function escapeHtml(str){
+    return String(str)
+      .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ---------------------------------------------------------------
+  // GENERATE QR
+  // ---------------------------------------------------------------
+  let lastGenerated = [];
+
+  document.getElementById('generateBtn').addEventListener('click', function(){
+    const s = currentSettings();
+    const baseUrl = (s.baseUrl || document.getElementById('baseUrlInput').value).trim().replace(/\/$/, '');
+    const campus = document.getElementById('campusInput').value.trim();
+    const raw = document.getElementById('locationsInput').value;
+    const locations = raw.split('\n').map(l=>l.trim()).filter(l=>l.length>0);
+
+    const resultsEl = document.getElementById('qrResults');
+    const emptyEl = document.getElementById('generateEmpty');
+    const printBtn = document.getElementById('printAllBtn');
+    resultsEl.innerHTML = '';
+    lastGenerated = [];
+
+    if (!baseUrl || locations.length === 0) {
+      emptyEl.style.display = 'block';
+      emptyEl.textContent = 'Please enter your live report URL (Settings tab) and at least one location.';
+      printBtn.style.display = 'none';
+      return;
+    }
+    emptyEl.style.display = 'none';
+    printBtn.style.display = 'inline-block';
+
+    locations.forEach(function(loc){
+      const fullLabel = campus ? `${campus} - ${loc}` : loc;
+      const fullUrl = `${baseUrl}/?location=${encodeURIComponent(fullLabel)}`;
+      lastGenerated.push({ label: fullLabel, url: fullUrl });
+
+      const item = document.createElement('div');
+      item.className = 'qr-item';
+
+      const qrHolder = document.createElement('div');
+      item.appendChild(qrHolder);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'qr-name';
+      nameEl.textContent = fullLabel;
+      item.appendChild(nameEl);
+
+      const urlEl = document.createElement('div');
+      urlEl.className = 'qr-url';
+      urlEl.textContent = fullUrl;
+      item.appendChild(urlEl);
+
+      const downloadBtn = document.createElement('button');
+      downloadBtn.className = 'btn small green';
+      downloadBtn.style.width = '100%';
+      downloadBtn.textContent = 'Download PNG';
+      item.appendChild(downloadBtn);
+
+      resultsEl.appendChild(item);
+
+      new QRCode(qrHolder, {
+        text: fullUrl,
+        width: 180,
+        height: 180,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+
+      downloadBtn.addEventListener('click', function(){
+        const canvas = qrHolder.querySelector('canvas');
+        const img = qrHolder.querySelector('img');
+        const dataUrl = canvas ? canvas.toDataURL('image/png') : img.src;
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = `QR-${fullLabel.replace(/[^a-z0-9\-_]/gi,'_')}.png`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      });
+    });
+  });
+
+  document.getElementById('printAllBtn').addEventListener('click', function(){
+    const printGrid = document.getElementById('printGrid');
+    printGrid.innerHTML = '';
+
+    // Re-render QR codes into the print sheet using the same data
+    lastGenerated.forEach(function(entry){
+      const wrap = document.createElement('div');
+      wrap.className = 'print-item';
+
+      const qrHolder = document.createElement('div');
+      wrap.appendChild(qrHolder);
+
+      const nameEl = document.createElement('div');
+      nameEl.className = 'p-name';
+      nameEl.textContent = entry.label;
+      wrap.appendChild(nameEl);
+
+      const urlEl = document.createElement('div');
+      urlEl.className = 'p-url';
+      urlEl.textContent = entry.url;
+      wrap.appendChild(urlEl);
+
+      printGrid.appendChild(wrap);
+
+      new QRCode(qrHolder, {
+        text: entry.url,
+        width: 160,
+        height: 160,
+        colorDark: "#000000",
+        colorLight: "#ffffff",
+        correctLevel: QRCode.CorrectLevel.H
+      });
+    });
+
+    setTimeout(()=>{ window.print(); }, 200);
+  });
+
+  // ---------------------------------------------------------------
+  // SCAN & VERIFY
+  // ---------------------------------------------------------------
+  let html5QrCode = null;
+
+  document.getElementById('startScanBtn').addEventListener('click', async function(){
+    const resultWrap = document.getElementById('scanResultWrap');
+    resultWrap.innerHTML = '';
+    document.getElementById('startScanBtn').style.display = 'none';
+    document.getElementById('stopScanBtn').style.display = 'inline-block';
+
+    html5QrCode = new Html5Qrcode("scannerRegion");
+    try {
+      await html5QrCode.start(
+        { facingMode: "environment" },
+        { fps: 10, qrbox: 220 },
+        function(decodedText){
+          onScanSuccess(decodedText);
+        },
+        function(errorMsg){ /* ignore per-frame scan errors */ }
+      );
+    } catch(err){
+      resultWrap.innerHTML = `<div class="scan-result invalid"><span class="scan-tag invalid">Camera Error</span><br>${escapeHtml(err.message || String(err))}</div>`;
+      stopScanner();
+    }
+  });
+
+  document.getElementById('stopScanBtn').addEventListener('click', stopScanner);
+
+  function stopScanner(){
+    document.getElementById('startScanBtn').style.display = 'inline-block';
+    document.getElementById('stopScanBtn').style.display = 'none';
+    if (html5QrCode) {
+      html5QrCode.stop().catch(()=>{});
+      html5QrCode = null;
+    }
+  }
+
+  function onScanSuccess(decodedText){
+    const s = currentSettings();
+    const resultWrap = document.getElementById('scanResultWrap');
+    const expectedBase = (s.baseUrl || '').trim().replace(/\/$/, '');
+    const isValid = expectedBase && decodedText.indexOf(expectedBase) === 0;
+
+    let locationLabel = '(could not parse)';
+    try {
+      const u = new URL(decodedText);
+      const loc = u.searchParams.get('location');
+      if (loc) locationLabel = decodeURIComponent(loc);
+    } catch(e){}
+
+    resultWrap.innerHTML = `
+      <div class="scan-result ${isValid ? 'valid' : 'invalid'}">
+        <span class="scan-tag ${isValid ? 'valid' : 'invalid'}">${isValid ? 'Valid — matches your live site' : 'Warning — does not match your configured URL'}</span><br>
+        <strong>Decoded location:</strong> ${escapeHtml(locationLabel)}<br>
+        <strong>Full URL:</strong> ${escapeHtml(decodedText)}
+      </div>
+    `;
+    stopScanner();
+  }
+</script>
+</body>
+</html>

@@ -56,7 +56,10 @@ const CONFIG = {
   RESPONDER_EMAIL: "safety-team@example.com",   // <-- change to real responder email
   SHEET_NAME: "Incidents",
   // Optional: comma-separated list of extra emails to CC on every alert
-  CC_EMAILS: "" // e.g. "manager@example.com,facilities@example.com"
+  CC_EMAILS: "", // e.g. "manager@example.com,facilities@example.com"
+  // A password-like secret only you and admin.html know. Required to read
+  // incident data via the Dashboard tab. Make this long and hard to guess.
+  ADMIN_TOKEN: "CHANGE-THIS-TO-A-LONG-RANDOM-VALUE"
 };
 // ============================================================================
 
@@ -89,13 +92,61 @@ function doPost(e) {
 }
 
 /**
- * Optional: lets you open the Web App URL in a browser to sanity-check
- * that the deployment is live (GET requests aren't used by the form).
+ * Handles GET requests.
+ *
+ * - No parameters: simple "is it alive" text response (used by admin.html's
+ *   connection status check, and handy to sanity-check in a browser).
+ * - ?action=list&token=...&limit=N: returns the most recent N incidents as
+ *   JSON, for the admin.html Dashboard tab. Requires the correct
+ *   CONFIG.ADMIN_TOKEN — this is the ONLY thing standing between "Anyone"
+ *   Web App access and someone reading your incident log, so set a real
+ *   secret value in CONFIG.ADMIN_TOKEN before relying on this.
  */
 function doGet(e) {
+  const action = e && e.parameter ? e.parameter.action : null;
+
+  if (action === "list") {
+    return handleListIncidents(e.parameter);
+  }
+
   return ContentService
     .createTextOutput("Emergency Report backend is running.")
     .setMimeType(ContentService.MimeType.TEXT);
+}
+
+function handleListIncidents(params) {
+  const token = params.token || "";
+  if (!CONFIG.ADMIN_TOKEN || CONFIG.ADMIN_TOKEN.indexOf("CHANGE-THIS") === 0) {
+    return jsonResponse({ status: "error", message: "ADMIN_TOKEN not configured on the backend yet." });
+  }
+  if (token !== CONFIG.ADMIN_TOKEN) {
+    return jsonResponse({ status: "error", message: "Invalid or missing admin token." });
+  }
+
+  const limit = Math.min(parseInt(params.limit, 10) || 50, 500);
+  const sheet = getOrCreateSheet();
+  const lastRow = sheet.getLastRow();
+
+  if (lastRow < 2) {
+    return jsonResponse({ status: "success", incidents: [] });
+  }
+
+  const startRow = Math.max(2, lastRow - limit + 1);
+  const numRows = lastRow - startRow + 1;
+  const values = sheet.getRange(startRow, 1, numRows, 6).getValues();
+
+  const incidents = values.map(function(row){
+    return {
+      timestamp: row[0] instanceof Date ? row[0].toISOString() : String(row[0]),
+      location: row[1],
+      incidentType: row[2],
+      description: row[3],
+      reporterName: row[4],
+      reporterPhone: row[5]
+    };
+  });
+
+  return jsonResponse({ status: "success", incidents: incidents });
 }
 
 // ----------------------------------------------------------------------------
